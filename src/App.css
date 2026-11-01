@@ -1,0 +1,5 @@
+/* Intentionally empty — all styling in this app comes from Tailwind
+   utility classes directly in the JSX (see App.jsx). The original
+   Vite template's App.css has been removed since its selectors
+   (.hero, .counter, #next-steps, etc.) targeted markup from the
+   default Vite starter page, not this app. */
