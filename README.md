@@ -7,6 +7,9 @@ lessons, and drill meaning/reading reviews as often as you like.
 It talks directly to the [WaniKani API v2](https://docs.api.wanikani.com/)
 from the browser using your personal access token. There is no backend.
 
+> This is an unofficial, community-made tool. It is not affiliated with or
+> endorsed by WaniKani or Tofugu.
+
 ## Features
 
 - **Lessons**: meanings, readings (on'yomi/kun'yomi), highlighted mnemonics,
