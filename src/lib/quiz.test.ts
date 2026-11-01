@@ -7,7 +7,7 @@ const vocab = { id: 3, readings: [{ reading: "ひと" }] };
 const subjects = [radical, kanji, vocab];
 
 // Deterministic pseudo-random generator so shuffles are reproducible.
-function seeded(seed) {
+function seeded(seed: number) {
   return () => {
     seed = (seed * 16807) % 2147483647;
     return (seed - 1) / 2147483646;
@@ -37,7 +37,7 @@ describe("buildQuizCards", () => {
     const many = Array.from({ length: 20 }, (_, i) => ({ id: i, readings: [{ reading: "あ" }] }));
     const cards = buildQuizCards(many, { random: seeded(7) });
     for (let i = 1; i < cards.length; i++) {
-      expect(cards[i].subjectId).not.toBe(cards[i - 1].subjectId);
+      expect(cards[i]!.subjectId).not.toBe(cards[i - 1]!.subjectId);
     }
   });
 });

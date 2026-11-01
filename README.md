@@ -41,10 +41,11 @@ default read-only permissions is enough.
 | Script               | What it does                     |
 | -------------------- | -------------------------------- |
 | `npm run dev`        | Start the Vite dev server        |
-| `npm run build`      | Production build into `dist/`    |
+| `npm run build`      | Type-check, then build `dist/`   |
 | `npm run preview`    | Serve the production build       |
 | `npm test`           | Run the test suite once (Vitest) |
 | `npm run test:watch` | Run tests in watch mode          |
+| `npm run typecheck`  | Type-check with TypeScript       |
 | `npm run lint`       | Lint with ESLint                 |
 
 `.npmrc` sets `legacy-peer-deps=true` because npm's resolver currently
@@ -54,16 +55,17 @@ mis-reports Vitest's (satisfied) peer dependency on Vite 8.
 
 ```
 src/
-  api/wanikani.js        API client: auth, timeouts, rate-limit retry, pagination, normalization
-  store/subjectStore.js  Session cache of subjects/levels/synonyms (one per token)
-  store/useSubjects.js   React hook + context for the store
-  lib/answers.js         Meaning/reading answer checking
-  lib/romaji.js          Romaji -> kana conversion for the reading input
-  lib/quiz.js            Building and re-queuing review cards
-  lib/markup.js          Parsing WaniKani's mnemonic markup
-  lib/subjects.js        Shared constants (levels, colors, labels) and helpers
-  lib/tokenStorage.js    Opt-in token persistence
+  api/wanikani.ts        API client: auth, timeouts, rate-limit retry, pagination, normalization
+  store/subjectStore.ts  Session cache of subjects/levels/synonyms (one per token)
+  store/useSubjects.ts   React hook + context for the store
+  lib/answers.ts         Meaning/reading answer checking
+  lib/romaji.ts          Romaji -> kana conversion for the reading input
+  lib/quiz.ts            Building and re-queuing review cards
+  lib/markup.ts          Parsing WaniKani's mnemonic markup
+  lib/subjects.ts        Shared constants (levels, colors, labels) and helpers
+  lib/tokenStorage.ts    Opt-in token persistence
   components/            TokenGate, Dashboard, LessonPage, Quiz and shared UI
+  types.ts               Shared domain types (Subject, Settings, QuizCard, …)
 ```
 
 ## Privacy

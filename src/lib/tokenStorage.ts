@@ -3,7 +3,7 @@
 // token isn't remembered.
 const KEY = "wk-no-srs:token";
 
-export function loadSavedToken() {
+export function loadSavedToken(): string | null {
   try {
     return localStorage.getItem(KEY);
   } catch {
@@ -11,7 +11,7 @@ export function loadSavedToken() {
   }
 }
 
-export function saveToken(token) {
+export function saveToken(token: string): void {
   try {
     localStorage.setItem(KEY, token);
   } catch {
@@ -19,7 +19,7 @@ export function saveToken(token) {
   }
 }
 
-export function clearSavedToken() {
+export function clearSavedToken(): void {
   try {
     localStorage.removeItem(KEY);
   } catch {

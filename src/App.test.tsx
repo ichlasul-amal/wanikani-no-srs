@@ -1,12 +1,14 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import userEvent, { type UserEvent } from "@testing-library/user-event";
+import type { RawSubject, RawSubjectData } from "./api/wanikani";
 import App from "./App";
+import type { SubjectType } from "./types";
 
 // A tiny fake of the WaniKani API: one radical, one kanji, one vocabulary
 // word on level 1, plus a level-2 kanji that only shows up as "used in".
-function subject(id, object, data) {
+function subject(id: number, object: SubjectType, data: Partial<RawSubjectData>): RawSubject {
   return {
     id,
     object,
@@ -58,7 +60,7 @@ const SUBJECTS = [
   }),
 ];
 
-const ANSWERS = {
+const ANSWERS: Record<string, string> = {
   "一:Radical Meaning": "ground",
   "一:Kanji Meaning": "one",
   "一:Kanji Reading": "ichi",
@@ -66,12 +68,12 @@ const ANSWERS = {
   "一つ:Vocabulary Reading": "hitotsu",
 };
 
-function respond(body) {
+function respond(body: unknown) {
   return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
 }
 
-function fakeFetch(url, init) {
-  if (init.headers.Authorization !== "Bearer good-token") {
+function fakeFetch(url: string, init: RequestInit) {
+  if ((init.headers as Record<string, string>).Authorization !== "Bearer good-token") {
     return Promise.resolve(new Response("{}", { status: 401 }));
   }
   const { pathname, searchParams } = new URL(url);
@@ -81,20 +83,20 @@ function fakeFetch(url, init) {
   if (pathname === "/v2/study_materials") return respond({ data: [], pages: { next_url: null } });
   if (pathname === "/v2/subjects") {
     let rows = SUBJECTS;
-    if (searchParams.get("levels")) {
-      const levels = searchParams.get("levels").split(",").map(Number);
-      rows = rows.filter((s) => levels.includes(s.data.level));
-    }
-    if (searchParams.get("ids")) {
-      const ids = searchParams.get("ids").split(",").map(Number);
-      rows = rows.filter((s) => ids.includes(s.id));
-    }
+    const levels = searchParams.get("levels")?.split(",").map(Number);
+    if (levels) rows = rows.filter((s) => levels.includes(s.data.level));
+    const ids = searchParams.get("ids")?.split(",").map(Number);
+    if (ids) rows = rows.filter((s) => ids.includes(s.id));
     return respond({ data: rows, pages: { next_url: null } });
   }
   return Promise.resolve(new Response("{}", { status: 404 }));
 }
 
-async function connect(user) {
+function levelButton(name: RegExp) {
+  return screen.getByRole("button", { name }) as HTMLButtonElement;
+}
+
+async function connect(user: UserEvent) {
   render(<App />);
   await user.type(screen.getByLabelText(/api token/i), "good-token");
   await user.click(screen.getByRole("button", { name: "Connect" }));
@@ -123,8 +125,8 @@ describe("App", () => {
   it("locks levels beyond the subscription", async () => {
     const user = userEvent.setup();
     await connect(user);
-    expect(screen.getByRole("button", { name: /level 3$/i }).disabled).toBe(false);
-    expect(screen.getByRole("button", { name: /level 4$/i }).disabled).toBe(true);
+    expect(levelButton(/level 3$/i).disabled).toBe(false);
+    expect(levelButton(/level 4$/i).disabled).toBe(true);
   });
 
   it("walks through lessons with cross-level relations", async () => {
@@ -156,7 +158,7 @@ describe("App", () => {
     let shookOnce = false;
     for (let step = 0; step < 20 && !screen.queryByText("Session complete"); step++) {
       const prompt = screen.getByText(/(Radical|Kanji|Vocabulary) (Meaning|Reading)$/).textContent;
-      const characters = document.querySelector("[lang=ja].text-6xl").textContent;
+      const characters = document.querySelector("[lang=ja].text-6xl")?.textContent;
       const key = `${characters}:${prompt}`;
       const input = screen.getByRole("textbox");
 
@@ -181,7 +183,7 @@ describe("App", () => {
     expect(screen.getByText("Session complete")).toBeTruthy();
     expect(missedOnce && shookOnce).toBe(true);
     const missed = screen.getByText("Missed").previousSibling;
-    expect(missed.textContent).toBe("1");
+    expect(missed?.textContent).toBe("1");
     expect(within(document.body).getByRole("button", { name: /review 1 missed again/i })).toBeTruthy();
   });
 

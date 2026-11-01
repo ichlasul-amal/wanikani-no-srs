@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { checkMeaning, checkReading, finalizeReading, levenshtein, normalizeMeaning } from "./answers";
+import {
+  type AnswerSubject,
+  checkMeaning,
+  checkReading,
+  finalizeReading,
+  levenshtein,
+  normalizeMeaning,
+} from "./answers";
 
-const kanji = {
-  type: "kanji",
+const kanji: AnswerSubject = {
   meanings: [
     { meaning: "Person", primary: true, accepted_answer: true },
   ],
@@ -17,8 +23,7 @@ const kanji = {
   ],
 };
 
-const vocab = {
-  type: "vocabulary",
+const vocab: AnswerSubject = {
   meanings: [{ meaning: "Large Intestine", primary: true, accepted_answer: true }],
   auxiliaryMeanings: [],
   readings: [{ reading: "だいちょう", primary: true, accepted_answer: true }],
@@ -55,7 +60,7 @@ describe("checkMeaning", () => {
   it("forgives small typos on longer answers only", () => {
     expect(checkMeaning(vocab, "large intestin")).toEqual({ status: "correct", close: true });
     expect(checkMeaning(kanji, "persan")).toEqual({ status: "correct", close: true });
-    expect(checkMeaning({ ...kanji, meanings: [{ meaning: "Cat", accepted_answer: true }] }, "car"))
+    expect(checkMeaning({ ...kanji, meanings: [{ meaning: "Cat", primary: true, accepted_answer: true }] }, "car"))
       .toEqual({ status: "wrong" });
   });
 
@@ -84,7 +89,7 @@ describe("checkReading", () => {
   it("does not count a non-accepted reading as wrong", () => {
     const result = checkReading(kanji, "ひと");
     expect(result.status).toBe("invalid");
-    expect(result.message).toContain("on'yomi");
+    expect(result).toMatchObject({ message: expect.stringContaining("on'yomi") });
   });
 
   it("marks other kana as wrong", () => {

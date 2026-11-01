@@ -1,7 +1,18 @@
-// questionTypes: "both" | "meaning" | "reading"
-// order: "shuffled" | "ordered"
-export function buildQuizCards(subjects, { questionTypes = "both", order = "shuffled", random = Math.random } = {}) {
-  const cards = [];
+import type { QuestionTypes, QuizCard, QuizOrder, Subject } from "../types";
+
+interface BuildOptions {
+  questionTypes?: QuestionTypes;
+  order?: QuizOrder;
+  random?: () => number;
+}
+
+type QuizSubject = Pick<Subject, "id"> & { readings: readonly unknown[] };
+
+export function buildQuizCards(
+  subjects: readonly QuizSubject[],
+  { questionTypes = "both", order = "shuffled", random = Math.random }: BuildOptions = {}
+): QuizCard[] {
+  const cards: QuizCard[] = [];
   subjects.forEach((s) => {
     if (questionTypes !== "reading") {
       cards.push({ id: `${s.id}:meaning`, subjectId: s.id, askType: "meaning" });
@@ -17,25 +28,28 @@ export function buildQuizCards(subjects, { questionTypes = "both", order = "shuf
 
 // Fisher-Yates shuffle, then nudge the meaning and reading cards of the
 // same subject apart so one doesn't give away the other.
-function shuffleSpread(cards, random) {
+function shuffleSpread(cards: QuizCard[], random: () => number): QuizCard[] {
+  const swap = (i: number, j: number) => {
+    [cards[i], cards[j]] = [cards[j]!, cards[i]!];
+  };
+
   for (let i = cards.length - 1; i > 0; i--) {
-    const j = Math.floor(random() * (i + 1));
-    [cards[i], cards[j]] = [cards[j], cards[i]];
+    swap(i, Math.floor(random() * (i + 1)));
   }
 
   const minGap = Math.min(3, Math.floor(cards.length / 2));
-  const tooClose = (pos, subjectId) => {
+  const tooClose = (pos: number, subjectId: number) => {
     for (let back = 1; back <= minGap && pos - back >= 0; back++) {
-      if (cards[pos - back].subjectId === subjectId) return true;
+      if (cards[pos - back]!.subjectId === subjectId) return true;
     }
     return false;
   };
 
   for (let i = 1; i < cards.length; i++) {
-    if (!tooClose(i, cards[i].subjectId)) continue;
+    if (!tooClose(i, cards[i]!.subjectId)) continue;
     for (let swapWith = i + 1; swapWith < cards.length; swapWith++) {
-      if (!tooClose(i, cards[swapWith].subjectId)) {
-        [cards[i], cards[swapWith]] = [cards[swapWith], cards[i]];
+      if (!tooClose(i, cards[swapWith]!.subjectId)) {
+        swap(i, swapWith);
         break;
       }
     }
@@ -45,7 +59,7 @@ function shuffleSpread(cards, random) {
 
 // Put a missed card back into the queue a few cards later, so it comes up
 // again before the session ends.
-export function requeue(queue, position, card, random = Math.random) {
+export function requeue<T>(queue: readonly T[], position: number, card: T, random: () => number = Math.random): T[] {
   const gap = 3 + Math.floor(random() * 6);
   const insertAt = Math.min(position + 1 + gap, queue.length);
   return [...queue.slice(0, insertAt), card, ...queue.slice(insertAt)];

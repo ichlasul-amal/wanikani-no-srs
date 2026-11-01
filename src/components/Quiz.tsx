@@ -1,30 +1,41 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type ChangeEvent, type FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Check, ChevronRight, RotateCcw, X } from "lucide-react";
-import { checkMeaning, checkReading, finalizeReading } from "../lib/answers";
+import { type Verdict, checkMeaning, checkReading, finalizeReading } from "../lib/answers";
 import { buildQuizCards, requeue } from "../lib/quiz";
 import { toKanaWhileTyping } from "../lib/romaji";
-import { TYPE_COLOR, TYPE_LABEL, primaryMeaning } from "../lib/subjects";
+import { READING_TYPE_LABEL, TYPE_COLOR, TYPE_LABEL, primaryMeaning } from "../lib/subjects";
 import { useSubjects } from "../store/useSubjects";
+import type { AskType, QuizCard, Settings, Subject, TypeFilter } from "../types";
 import { CharacterGlyph, NavBar, TypeBadge } from "./ui";
 
-const READING_TYPE_LABEL = { onyomi: "on'yomi", kunyomi: "kun'yomi", nanori: "nanori" };
+type GradedVerdict = Exclude<Verdict, { status: "invalid" }>;
 
-function correctAnswerText(subject, askType) {
+interface Session {
+  queue: QuizCard[];
+  total: number;
+  position: number;
+  finished: number;
+  // First-attempt result per card id; later retries don't change it.
+  firstAttempts: Record<string, boolean>;
+}
+
+function correctAnswerText(subject: Subject, askType: AskType): string {
   if (askType === "meaning") return subject.meanings.map((m) => m.meaning).join(", ");
   const accepted = subject.readings.filter((r) => r.accepted_answer !== false);
   if (!accepted.some((r) => r.type)) return accepted.map((r) => r.reading).join(", ");
-  const groups = {};
-  accepted.forEach((r) => (groups[r.type] ??= []).push(r.reading));
-  return Object.entries(groups)
-    .map(([type, list]) => `${READING_TYPE_LABEL[type] ?? type}: ${list.join(", ")}`)
-    .join(" / ");
+  const groups = new Map<string, string[]>();
+  accepted.forEach((r) => {
+    const label = r.type ? READING_TYPE_LABEL[r.type] : "reading";
+    groups.set(label, [...(groups.get(label) ?? []), r.reading]);
+  });
+  return [...groups].map(([label, list]) => `${label}: ${list.join(", ")}`).join(" / ");
 }
 
-function newSession(cards) {
+function newSession(cards: QuizCard[]): Session {
   return { queue: cards, total: cards.length, position: 0, finished: 0, firstAttempts: {} };
 }
 
-function SummaryRow({ subject, askType, correct }) {
+function SummaryRow({ subject, askType, correct }: { subject: Subject; askType: AskType; correct: boolean }) {
   return (
     <div
       className={`flex items-center gap-3 p-2.5 rounded-lg ${
@@ -39,7 +50,10 @@ function SummaryRow({ subject, askType, correct }) {
       </span>
       <span className="text-sm text-slate-900 dark:text-slate-100 font-semibold">{primaryMeaning(subject)}</span>
       {!correct && (
-        <span lang={askType === "reading" ? "ja" : undefined} className="text-xs text-slate-500 dark:text-slate-400 font-ja truncate">
+        <span
+          lang={askType === "reading" ? "ja" : undefined}
+          className="text-xs text-slate-500 dark:text-slate-400 font-ja truncate"
+        >
           {correctAnswerText(subject, askType)}
         </span>
       )}
@@ -50,16 +64,21 @@ function SummaryRow({ subject, askType, correct }) {
   );
 }
 
-export default function Quiz({ levels, types, options, onBack }) {
+interface QuizProps {
+  levels: number[];
+  types: TypeFilter[];
+  options: Pick<Settings, "questionTypes" | "order" | "repeatWrong">;
+  onBack: () => void;
+}
+
+export default function Quiz({ levels, types, options, onBack }: QuizProps) {
   const { data } = useSubjects();
-  const [session, setSession] = useState(() =>
-    newSession(buildQuizCards(data.subjectsFor(levels, types), options))
-  );
+  const [session, setSession] = useState(() => newSession(buildQuizCards(data.subjectsFor(levels, types), options)));
   const [input, setInput] = useState("");
-  const [result, setResult] = useState(null); // { status: "correct"|"wrong", close? }
-  const [shake, setShake] = useState(null); // { message, active }
-  const inputRef = useRef(null);
-  const pendingCaret = useRef(null);
+  const [result, setResult] = useState<GradedVerdict | null>(null);
+  const [shake, setShake] = useState<{ message: string; active: boolean } | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const pendingCaret = useRef<number | null>(null);
 
   const { queue, total, position, finished, firstAttempts } = session;
   const card = queue[position];
@@ -81,9 +100,10 @@ export default function Quiz({ levels, types, options, onBack }) {
   const wrongCount = firstResults.length - correctCount;
 
   if (!card) {
-    const entries = Object.entries(firstAttempts).map(([id, correct]) => {
-      const [subjectId, askType] = id.split(":");
-      return { id, subject: data.get(Number(subjectId)), askType, correct };
+    const entries = Object.entries(firstAttempts).flatMap(([id, correct]) => {
+      const [subjectId, askType] = id.split(":") as [string, AskType];
+      const subject = data.get(Number(subjectId));
+      return subject ? [{ id, subject, askType, correct }] : [];
     });
     const missed = entries.filter((e) => !e.correct);
 
@@ -148,11 +168,12 @@ export default function Quiz({ levels, types, options, onBack }) {
   }
 
   const subject = data.get(card.subjectId);
+  if (!subject) return null;
   const color = TYPE_COLOR[subject.type];
   const isReading = card.askType === "reading";
   const isLast = position === queue.length - 1;
 
-  function handleChange(e) {
+  function handleChange(e: ChangeEvent<HTMLInputElement>) {
     const el = e.target;
     if (!isReading) {
       setInput(el.value);
@@ -166,7 +187,9 @@ export default function Quiz({ levels, types, options, onBack }) {
     pendingCaret.current = before.length;
   }
 
-  function submitAnswer() {
+  // Arrow functions (not declarations) so TypeScript keeps the narrowing
+  // of `card` and `subject` from the early returns above.
+  const submitAnswer = () => {
     const verdict = isReading
       ? checkReading(subject, input)
       : checkMeaning(subject, input, data.synonymsFor(subject.id));
@@ -187,7 +210,7 @@ export default function Quiz({ levels, types, options, onBack }) {
       finished: correct || !options.repeatWrong ? s.finished + 1 : s.finished,
       firstAttempts: card.id in s.firstAttempts ? s.firstAttempts : { ...s.firstAttempts, [card.id]: correct },
     }));
-  }
+  };
 
   function goNext() {
     setResult(null);
@@ -196,7 +219,7 @@ export default function Quiz({ levels, types, options, onBack }) {
     setSession((s) => ({ ...s, position: s.position + 1 }));
   }
 
-  function handleSubmit(e) {
+  function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (result) goNext();
     else submitAnswer();
@@ -289,7 +312,9 @@ export default function Quiz({ levels, types, options, onBack }) {
         />
 
         <div id="answer-feedback" aria-live="polite" className="mt-4">
-          {shake && !result && <p className="text-sm font-medium text-amber-700 dark:text-amber-400">{shake.message}</p>}
+          {shake && !result && (
+            <p className="text-sm font-medium text-amber-700 dark:text-amber-400">{shake.message}</p>
+          )}
           {result && (
             <div
               className={`flex items-center gap-3 p-4 rounded-xl ${

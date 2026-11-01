@@ -1,15 +1,21 @@
-import { useState } from "react";
+import { type FormEvent, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { WaniKaniError, getUser } from "../api/wanikani";
+import type { User } from "../types";
 import { ErrorBanner } from "./ui";
 
-export default function TokenGate({ onConnected, initialError = null }) {
+interface TokenGateProps {
+  onConnected: (token: string, user: User, remember: boolean) => void;
+  initialError?: string | null;
+}
+
+export default function TokenGate({ onConnected, initialError = null }: TokenGateProps) {
   const [tokenInput, setTokenInput] = useState("");
   const [remember, setRemember] = useState(false);
   const [checking, setChecking] = useState(false);
-  const [error, setError] = useState(initialError);
+  const [error, setError] = useState<string | null>(initialError);
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const token = tokenInput.trim();
     if (!token) return;

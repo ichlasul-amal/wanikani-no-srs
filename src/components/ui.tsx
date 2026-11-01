@@ -1,8 +1,10 @@
+import type { ReactNode } from "react";
 import { AlertCircle, ChevronLeft, Loader2 } from "lucide-react";
-import { parseMarkup } from "../lib/markup";
+import { type MarkupTag, parseMarkup } from "../lib/markup";
 import { TYPE_COLOR, TYPE_ICON_CHAR, TYPE_LABEL, primaryMeaning } from "../lib/subjects";
+import type { Subject, SubjectType, TypeFilter } from "../types";
 
-export function TypeBadge({ type }) {
+export function TypeBadge({ type }: { type: SubjectType }) {
   return (
     <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-semibold bg-white text-slate-900">
       {TYPE_LABEL[type]}
@@ -10,7 +12,7 @@ export function TypeBadge({ type }) {
   );
 }
 
-export function TypeIconSquare({ type, active = true }) {
+export function TypeIconSquare({ type, active = true }: { type: TypeFilter; active?: boolean }) {
   return (
     <span
       aria-hidden="true"
@@ -25,7 +27,14 @@ export function TypeIconSquare({ type, active = true }) {
   );
 }
 
-export function NavBar({ title, onBack, backLabel = "Back", right }) {
+interface NavBarProps {
+  title?: string;
+  onBack?: () => void;
+  backLabel?: string;
+  right?: ReactNode;
+}
+
+export function NavBar({ title, onBack, backLabel = "Back", right }: NavBarProps) {
   return (
     <div className="flex items-center justify-between gap-3 mb-6">
       <div className="flex items-center gap-3">
@@ -46,9 +55,15 @@ export function NavBar({ title, onBack, backLabel = "Back", right }) {
   );
 }
 
+interface CharacterGlyphProps {
+  subject: Subject;
+  className?: string;
+  imgSize?: number;
+}
+
 // Renders the subject's character, or its SVG image for radicals that
 // have no unicode character.
-export function CharacterGlyph({ subject, className = "", imgSize = 24 }) {
+export function CharacterGlyph({ subject, className = "", imgSize = 24 }: CharacterGlyphProps) {
   if (subject.characters) {
     return (
       <span lang="ja" className={`font-ja ${className}`}>
@@ -69,7 +84,7 @@ export function CharacterGlyph({ subject, className = "", imgSize = 24 }) {
   return <span className={className}>?</span>;
 }
 
-export function RelatedChip({ subject, onClick }) {
+export function RelatedChip({ subject, onClick }: { subject: Subject; onClick: () => void }) {
   return (
     <button
       type="button"
@@ -83,13 +98,11 @@ export function RelatedChip({ subject, onClick }) {
   );
 }
 
-export function SectionLabel({ children, className = "" }) {
-  return (
-    <p className={`text-xs uppercase tracking-wide text-slate-400 font-semibold mb-2 ${className}`}>{children}</p>
-  );
+export function SectionLabel({ children }: { children: ReactNode }) {
+  return <p className="text-xs uppercase tracking-wide text-slate-400 font-semibold mb-2">{children}</p>;
 }
 
-export function LoadingBanner({ children }) {
+export function LoadingBanner({ children }: { children: ReactNode }) {
   return (
     <div
       role="status"
@@ -101,7 +114,7 @@ export function LoadingBanner({ children }) {
   );
 }
 
-export function ErrorBanner({ children, onRetry }) {
+export function ErrorBanner({ children, onRetry }: { children: ReactNode; onRetry?: () => void }) {
   return (
     <div
       role="alert"
@@ -124,7 +137,7 @@ export function ErrorBanner({ children, onRetry }) {
   );
 }
 
-export function NoticeBanner({ children }) {
+export function NoticeBanner({ children }: { children: ReactNode }) {
   return (
     <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-950/40 dark:border-amber-900 text-center">
       <p className="text-sm text-amber-800 dark:text-amber-300 font-medium">{children}</p>
@@ -132,7 +145,7 @@ export function NoticeBanner({ children }) {
   );
 }
 
-const MARKUP_CLASS = {
+const MARKUP_CLASS: Record<MarkupTag, string> = {
   radical: "px-1 rounded text-white",
   kanji: "px-1 rounded text-white",
   vocabulary: "px-1 rounded text-white",
@@ -141,24 +154,30 @@ const MARKUP_CLASS = {
   ja: "font-ja",
 };
 
+const MARKUP_COLOR: Partial<Record<MarkupTag, string>> = {
+  radical: TYPE_COLOR.radical,
+  kanji: TYPE_COLOR.kanji,
+  vocabulary: TYPE_COLOR.vocabulary,
+};
+
 // A WaniKani mnemonic with its inline highlights styled like on WaniKani.
-export function Mnemonic({ text }) {
+export function Mnemonic({ text }: { text: string }) {
   return (
     <p className="text-slate-700 dark:text-slate-300 text-base leading-relaxed whitespace-pre-line">
-      {parseMarkup(text).map((seg, i) =>
-        seg.tag ? (
+      {parseMarkup(text).map((seg, i) => {
+        if (!seg.tag) return <span key={i}>{seg.text}</span>;
+        const color = MARKUP_COLOR[seg.tag];
+        return (
           <span
             key={i}
             lang={seg.tag === "ja" || seg.tag === "reading" ? "ja" : undefined}
             className={MARKUP_CLASS[seg.tag]}
-            style={TYPE_COLOR[seg.tag] ? { backgroundColor: TYPE_COLOR[seg.tag] } : undefined}
+            style={color ? { backgroundColor: color } : undefined}
           >
             {seg.text}
           </span>
-        ) : (
-          <span key={i}>{seg.text}</span>
-        )
-      )}
+        );
+      })}
     </p>
   );
 }

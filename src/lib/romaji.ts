@@ -8,7 +8,7 @@ import { toKana } from "wanakana";
 
 const IME = { IMEMode: true };
 
-function prepare(text) {
+function prepare(text: string): string {
   return text
     .toLowerCase()
     .replace(/tch/g, "cch")
@@ -18,13 +18,13 @@ function prepare(text) {
 
 // Conversion while typing: romaji that may still change (a trailing "n",
 // "nn" or lone consonant) is left as-is until the next letter arrives.
-export function toKanaWhileTyping(text) {
+export function toKanaWhileTyping(text: string): string {
   const s = prepare(text);
   if (s.endsWith("nn")) return toKana(s.slice(0, -2), IME) + "nn";
   return toKana(s, IME);
 }
 
 // Conversion on submit: commit anything that was being held back.
-export function toKanaFinal(text) {
+export function toKanaFinal(text: string): string {
   return toKana(toKanaWhileTyping(text).replace(/nn$/, "n"));
 }

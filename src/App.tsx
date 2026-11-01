@@ -9,8 +9,11 @@ import { TYPE_FILTERS } from "./lib/subjects";
 import { clearSavedToken, loadSavedToken, saveToken } from "./lib/tokenStorage";
 import { SubjectStore } from "./store/subjectStore";
 import { SubjectStoreContext } from "./store/useSubjects";
+import type { Settings, User } from "./types";
 
-const DEFAULT_SETTINGS = {
+type View = "restoring" | "connect" | "dashboard" | "lessons" | "reviews";
+
+const DEFAULT_SETTINGS: Settings = {
   levels: [1],
   types: TYPE_FILTERS,
   questionTypes: "both",
@@ -20,16 +23,15 @@ const DEFAULT_SETTINGS = {
 
 export default function App() {
   const [savedToken] = useState(loadSavedToken);
-  // view: restoring | connect | dashboard | lessons | reviews
-  const [view, setView] = useState(savedToken ? "restoring" : "connect");
-  const [connectError, setConnectError] = useState(null);
-  const [store, setStore] = useState(null);
-  const [user, setUser] = useState(null);
-  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [view, setView] = useState<View>(savedToken ? "restoring" : "connect");
+  const [connectError, setConnectError] = useState<string | null>(null);
+  const [store, setStore] = useState<SubjectStore | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   // Bumped on every Lessons/Reviews start so the page remounts fresh.
   const [sessionKey, setSessionKey] = useState(0);
 
-  function connect(token, nextUser, remember) {
+  function connect(token: string, nextUser: User, remember: boolean) {
     if (remember) saveToken(token);
     setStore(new SubjectStore(token));
     setUser(nextUser);
@@ -46,15 +48,15 @@ export default function App() {
     setView("connect");
   }
 
-  const onRestored = useEffectEvent((restoredUser) => connect(savedToken, restoredUser, false));
+  const onRestored = useEffectEvent((token: string, restoredUser: User) => connect(token, restoredUser, false));
 
   // Sign back in with a remembered token.
   useEffect(() => {
     if (!savedToken) return;
     const controller = new AbortController();
     getUser(savedToken, { signal: controller.signal })
-      .then(onRestored)
-      .catch((err) => {
+      .then((u) => onRestored(savedToken, u))
+      .catch((err: unknown) => {
         if (controller.signal.aborted) return;
         if (err instanceof WaniKaniError && err.status === 401) clearSavedToken();
         setConnectError(err instanceof Error ? err.message : "Couldn't sign you back in.");
@@ -63,7 +65,7 @@ export default function App() {
     return () => controller.abort();
   }, [savedToken]);
 
-  function startSession(nextView) {
+  function startSession(nextView: "lessons" | "reviews") {
     setSessionKey((k) => k + 1);
     setView(nextView);
   }
@@ -81,7 +83,7 @@ export default function App() {
 
         {view === "connect" && <TokenGate onConnected={connect} initialError={connectError} />}
 
-        {store && (
+        {store && user && (
           <SubjectStoreContext value={store}>
             {view === "dashboard" && (
               <Dashboard

@@ -1,14 +1,29 @@
 import { useEffect, useEffectEvent, useState } from "react";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
-import { TYPE_COLOR, TYPE_LABEL, primaryMeaning } from "../lib/subjects";
+import { READING_TYPE_LABEL, TYPE_COLOR, TYPE_LABEL, primaryMeaning } from "../lib/subjects";
 import { useSubjects } from "../store/useSubjects";
+import type { Subject, SubjectType, TypeFilter } from "../types";
 import { CharacterGlyph, Mnemonic, NavBar, RelatedChip, SectionLabel, TypeBadge } from "./ui";
 
-const COMPONENT_LABEL = { kanji: "Made of radicals", vocabulary: "Made of kanji" };
-const AMALGAMATION_LABEL = { radical: "Used in kanji", kanji: "Used in vocabulary" };
-const READING_TYPE_LABEL = { onyomi: "on'yomi", kunyomi: "kun'yomi", nanori: "nanori" };
+const COMPONENT_LABEL: Partial<Record<SubjectType, string>> = {
+  kanji: "Made of radicals",
+  vocabulary: "Made of kanji",
+};
+const AMALGAMATION_LABEL: Partial<Record<SubjectType, string>> = {
+  radical: "Used in kanji",
+  kanji: "Used in vocabulary",
+};
 
-function RelatedSection({ label, subjects, onSelect }) {
+// Where a relation-chip jump started from, so Back can return there.
+type JumpOrigin = { index: number } | { jumpedId: number };
+
+interface RelatedSectionProps {
+  label: string | undefined;
+  subjects: Subject[];
+  onSelect: (id: number) => void;
+}
+
+function RelatedSection({ label, subjects, onSelect }: RelatedSectionProps) {
   if (!label || subjects.length === 0) return null;
   return (
     <div>
@@ -22,19 +37,25 @@ function RelatedSection({ label, subjects, onSelect }) {
   );
 }
 
+interface LessonPageProps {
+  levels: number[];
+  types: TypeFilter[];
+  onBack: () => void;
+}
+
 // Walks through the selected subjects one at a time. Relation chips can
 // jump to any related subject (even from another level); Back returns to
 // wherever the jump started.
-export default function LessonPage({ levels, types, onBack }) {
+export default function LessonPage({ levels, types, onBack }: LessonPageProps) {
   const { store, data } = useSubjects();
   // Freeze the list for this session so it doesn't shift while related
   // subjects stream into the cache.
   const [subjects] = useState(() => data.subjectsFor(levels, types));
   const [index, setIndex] = useState(0);
-  const [jumpStack, setJumpStack] = useState([]);
-  const [jumpedId, setJumpedId] = useState(null);
+  const [jumpStack, setJumpStack] = useState<JumpOrigin[]>([]);
+  const [jumpedId, setJumpedId] = useState<number | null>(null);
 
-  const jumpedSubject = jumpedId != null ? data.get(jumpedId) : null;
+  const jumpedSubject = jumpedId != null ? data.get(jumpedId) : undefined;
   const subject = jumpedSubject ?? subjects[index];
   const isFirst = index === 0 && !jumpedSubject;
   const isLast = !jumpedSubject && index === subjects.length - 1;
@@ -54,7 +75,7 @@ export default function LessonPage({ levels, types, onBack }) {
     else onBack();
   }
 
-  function jumpTo(targetId) {
+  function jumpTo(targetId: number) {
     setJumpStack((stack) => [...stack, jumpedId != null ? { jumpedId } : { index }]);
     const inList = subjects.findIndex((s) => s.id === targetId);
     if (inList !== -1) {
@@ -66,10 +87,10 @@ export default function LessonPage({ levels, types, onBack }) {
   }
 
   function backFromJump() {
-    if (jumpStack.length > 0) {
-      const prev = jumpStack[jumpStack.length - 1];
+    const prev = jumpStack[jumpStack.length - 1];
+    if (prev) {
       setJumpStack((stack) => stack.slice(0, -1));
-      if (prev.jumpedId != null) {
+      if ("jumpedId" in prev) {
         setJumpedId(prev.jumpedId);
       } else {
         setJumpedId(null);
@@ -82,15 +103,15 @@ export default function LessonPage({ levels, types, onBack }) {
     }
   }
 
-  const onKeyDown = useEffectEvent((e) => {
-    const tag = e.target?.tagName;
-    if (tag === "INPUT" || tag === "TEXTAREA" || e.target?.isContentEditable) return;
+  const onKeyDown = useEffectEvent((e: KeyboardEvent) => {
+    const target = e.target as HTMLElement | null;
+    if (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.isContentEditable) return;
     if (e.key === "ArrowLeft") goPrev();
     else if (e.key === "ArrowRight") goNext();
   });
 
   useEffect(() => {
-    const handler = (e) => onKeyDown(e);
+    const handler = (e: KeyboardEvent) => onKeyDown(e);
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, []);
@@ -100,8 +121,9 @@ export default function LessonPage({ levels, types, onBack }) {
   const color = TYPE_COLOR[subject.type];
   const relatedIds = [...subject.componentIds, ...subject.amalgamationIds];
   const loadingRelated = relatedIds.some((id) => !data.has(id) && data.isResolving(id));
-  const components = subject.componentIds.map((id) => data.get(id)).filter(Boolean);
-  const amalgamations = subject.amalgamationIds.map((id) => data.get(id)).filter(Boolean);
+  const resolve = (ids: number[]) => ids.flatMap((id) => data.get(id) ?? []);
+  const components = resolve(subject.componentIds);
+  const amalgamations = resolve(subject.amalgamationIds);
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
@@ -163,7 +185,7 @@ export default function LessonPage({ levels, types, onBack }) {
                     {r.reading}
                   </span>
                   {r.type && (
-                    <span className="text-xs font-medium text-slate-400 ml-1">({READING_TYPE_LABEL[r.type] ?? r.type})</span>
+                    <span className="text-xs font-medium text-slate-400 ml-1">({READING_TYPE_LABEL[r.type]})</span>
                   )}
                 </p>
               ))}
@@ -236,8 +258,14 @@ export default function LessonPage({ levels, types, onBack }) {
         </button>
       </div>
       <p className="text-center text-xs text-slate-400 mt-3">
-        You can also use <kbd className="px-1.5 py-0.5 rounded border border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-800 font-mono">←</kbd>{" "}
-        <kbd className="px-1.5 py-0.5 rounded border border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-800 font-mono">→</kbd> on your keyboard
+        You can also use{" "}
+        <kbd className="px-1.5 py-0.5 rounded border border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-800 font-mono">
+          ←
+        </kbd>{" "}
+        <kbd className="px-1.5 py-0.5 rounded border border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-800 font-mono">
+          →
+        </kbd>{" "}
+        on your keyboard
       </p>
     </div>
   );

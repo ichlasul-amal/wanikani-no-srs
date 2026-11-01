@@ -1,30 +1,51 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type Dispatch, type SetStateAction, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { BookOpen, Brain, ChevronLeft, ChevronRight, Lock, LogOut } from "lucide-react";
 import { buildQuizCards } from "../lib/quiz";
 import { ALL_LEVELS, TYPE_COLOR, TYPE_FILTERS, TYPE_LABEL, filterCategory } from "../lib/subjects";
 import { useSubjects } from "../store/useSubjects";
+import type { QuestionTypes, QuizOrder, Settings, TypeFilter, User } from "../types";
 import { ErrorBanner, LoadingBanner, NoticeBanner, TypeIconSquare } from "./ui";
 
-const SOFT_BG = { radical: "bg-sky-50 dark:bg-sky-950/40", kanji: "bg-pink-50 dark:bg-pink-950/40", vocabulary: "bg-purple-50 dark:bg-purple-950/40" };
+const SOFT_BG: Record<TypeFilter, string> = {
+  radical: "bg-sky-50 dark:bg-sky-950/40",
+  kanji: "bg-pink-50 dark:bg-pink-950/40",
+  vocabulary: "bg-purple-50 dark:bg-purple-950/40",
+};
 
-const QUESTION_TYPE_OPTIONS = [
+const QUESTION_TYPE_OPTIONS: Option<QuestionTypes>[] = [
   { value: "both", label: "Meaning + Reading" },
   { value: "meaning", label: "Meaning only" },
   { value: "reading", label: "Reading only" },
 ];
-const ORDER_OPTIONS = [
+const ORDER_OPTIONS: Option<QuizOrder>[] = [
   { value: "shuffled", label: "Shuffled" },
   { value: "ordered", label: "Lesson order" },
 ];
 
-function formatLevels(levels) {
+interface Option<T extends string> {
+  value: T;
+  label: string;
+}
+
+function formatLevels(levels: readonly number[]): string {
   const sorted = [...levels].sort((a, b) => a - b);
   return sorted.length === 1 ? `level ${sorted[0]}` : `levels ${sorted.join(", ")}`;
 }
 
-function SegmentedControl({ label, options, value, onChange }) {
+interface SegmentedControlProps<T extends string> {
+  label: string;
+  options: Option<T>[];
+  value: T;
+  onChange: (value: T) => void;
+}
+
+function SegmentedControl<T extends string>({ label, options, value, onChange }: SegmentedControlProps<T>) {
   return (
-    <div role="radiogroup" aria-label={label} className="inline-flex rounded-lg border border-slate-300 dark:border-slate-700 overflow-hidden">
+    <div
+      role="radiogroup"
+      aria-label={label}
+      className="inline-flex rounded-lg border border-slate-300 dark:border-slate-700 overflow-hidden"
+    >
       {options.map((opt) => (
         <button
           key={opt.value}
@@ -45,12 +66,21 @@ function SegmentedControl({ label, options, value, onChange }) {
   );
 }
 
-export default function Dashboard({ user, settings, setSettings, onStudy, onQuiz, onDisconnect }) {
+interface DashboardProps {
+  user: User;
+  settings: Settings;
+  setSettings: Dispatch<SetStateAction<Settings>>;
+  onStudy: () => void;
+  onQuiz: () => void;
+  onDisconnect: () => void;
+}
+
+export default function Dashboard({ user, settings, setSettings, onStudy, onQuiz, onDisconnect }: DashboardProps) {
   const { store, data } = useSubjects();
   const { levels, types, questionTypes, order, repeatWrong } = settings;
   const [multiSelect, setMultiSelect] = useState(levels.length > 1);
-  const levelScrollRef = useRef(null);
-  const activeLevelRef = useRef(null);
+  const levelScrollRef = useRef<HTMLDivElement>(null);
+  const activeLevelRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     store.ensureLevels(levels);
@@ -70,15 +100,21 @@ export default function Dashboard({ user, settings, setSettings, onStudy, onQuiz
   const failed = statuses.filter((s) => s.status === "error");
 
   const allSubjects = useMemo(() => data.subjectsFor(levels, TYPE_FILTERS), [data, levels]);
-  const subjects = useMemo(() => allSubjects.filter((s) => types.includes(filterCategory(s.type))), [allSubjects, types]);
-  const reviewCount = useMemo(() => buildQuizCards(subjects, { questionTypes, order: "ordered" }).length, [subjects, questionTypes]);
+  const subjects = useMemo(
+    () => allSubjects.filter((s) => types.includes(filterCategory(s.type))),
+    [allSubjects, types]
+  );
+  const reviewCount = useMemo(
+    () => buildQuizCards(subjects, { questionTypes, order: "ordered" }).length,
+    [subjects, questionTypes]
+  );
 
-  const countsByType = { radical: 0, kanji: 0, vocabulary: 0 };
+  const countsByType: Record<TypeFilter, number> = { radical: 0, kanji: 0, vocabulary: 0 };
   allSubjects.forEach((s) => countsByType[filterCategory(s.type)]++);
 
-  const update = (patch) => setSettings((prev) => ({ ...prev, ...patch }));
+  const update = (patch: Partial<Settings>) => setSettings((prev) => ({ ...prev, ...patch }));
 
-  function selectLevel(level) {
+  function selectLevel(level: number) {
     if (!multiSelect) {
       update({ levels: [level] });
       return;
@@ -88,20 +124,23 @@ export default function Dashboard({ user, settings, setSettings, onStudy, onQuiz
   }
 
   function toggleMultiSelect() {
-    if (multiSelect && levels.length > 1) update({ levels: [levels[0]] });
+    if (multiSelect && levels.length > 1) update({ levels: levels.slice(0, 1) });
     setMultiSelect((m) => !m);
   }
 
-  function toggleType(type) {
+  function toggleType(type: TypeFilter) {
     update({ types: types.includes(type) ? types.filter((t) => t !== type) : [...types, type] });
   }
 
-  let notice = null;
+  let notice: string | null = null;
   if (types.length === 0) notice = "Select at least one subject type to get started.";
-  else if (!loading && failed.length === 0 && subjects.length === 0) notice = `No subjects found for ${formatLevels(levels)}.`;
-  else if (!loading && subjects.length > 0 && reviewCount === 0) notice = "None of the selected subjects have a reading to review. Pick another question type.";
+  else if (!loading && failed.length === 0 && subjects.length === 0)
+    notice = `No subjects found for ${formatLevels(levels)}.`;
+  else if (!loading && subjects.length > 0 && reviewCount === 0)
+    notice = "None of the selected subjects have a reading to review. Pick another question type.";
 
   const disabled = loading || failed.length > 0;
+  const firstFailure = failed[0];
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-10">
@@ -156,7 +195,13 @@ export default function Dashboard({ user, settings, setSettings, onStudy, onQuiz
                   onClick={() => selectLevel(lvl)}
                   disabled={locked}
                   aria-pressed={selected}
-                  title={locked ? "Requires an active WaniKani subscription" : lvl === user.level ? "Your current level" : undefined}
+                  title={
+                    locked
+                      ? "Requires an active WaniKani subscription"
+                      : lvl === user.level
+                        ? "Your current level"
+                        : undefined
+                  }
                   className={`relative shrink-0 flex items-center gap-1 px-4 py-2 rounded-lg font-bold border-2 transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
                     selected
                       ? "bg-slate-900 border-slate-900 text-white dark:bg-slate-100 dark:border-slate-100 dark:text-slate-900"
@@ -166,7 +211,10 @@ export default function Dashboard({ user, settings, setSettings, onStudy, onQuiz
                   {locked && <Lock size={12} aria-hidden="true" />}
                   Level {lvl}
                   {lvl === user.level && (
-                    <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: TYPE_COLOR.kanji }}>
+                    <span
+                      className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full"
+                      style={{ backgroundColor: TYPE_COLOR.kanji }}
+                    >
                       <span className="sr-only">(your level)</span>
                     </span>
                   )}
@@ -186,8 +234,8 @@ export default function Dashboard({ user, settings, setSettings, onStudy, onQuiz
       </section>
 
       {loading && <LoadingBanner>Loading {formatLevels(levels)} from WaniKani…</LoadingBanner>}
-      {failed.length > 0 && (
-        <ErrorBanner onRetry={() => store.retryLevels(failed.map((f) => f.level))}>{failed[0].error}</ErrorBanner>
+      {firstFailure && (
+        <ErrorBanner onRetry={() => store.retryLevels(failed.map((f) => f.level))}>{firstFailure.error}</ErrorBanner>
       )}
 
       <section className="mb-8" aria-labelledby="type-heading">

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { toKanaFinal, toKanaWhileTyping } from "./romaji";
 
 // Feed text one keystroke at a time, the way the input receives it.
-function type(text) {
+function type(text: string) {
   let value = "";
   for (const ch of text) value = toKanaWhileTyping(value + ch);
   return value;
