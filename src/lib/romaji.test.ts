@@ -11,8 +11,17 @@ function type(text: string) {
 describe("toKanaWhileTyping", () => {
   it("holds romaji that may still change", () => {
     expect(type("jin")).toBe("じn");
-    expect(type("jinn")).toBe("じnn");
     expect(type("ky")).toBe("ky");
+    expect(type("kon'")).toBe("こn'");
+    expect(type("kon'y")).toBe("こn'y");
+  });
+
+  it("shows nn as ん right away", () => {
+    expect(type("nn")).toBe("ん");
+    expect(type("jinn")).toBe("じん");
+    expect(type("nnn")).toBe("んn");
+    expect(type("nnnn")).toBe("んん");
+    expect(type("hannbunn")).toBe("はんぶん");
   });
 
   it("reads nn + vowel as ん + な/に/…", () => {
@@ -26,6 +35,8 @@ describe("toKanaWhileTyping", () => {
     expect(type("fairu")).toBe("ふぁいる");
     expect(type("matcha")).toBe("まっちゃ");
     expect(type("kon'ya")).toBe("こんや");
+    expect(type("ten'in")).toBe("てんいn");
+    expect(type("kon'nichi")).toBe("こんにち");
     expect(type("ra-men")).toBe("らーめn");
     expect(type("dzu")).toBe("づ");
   });
@@ -40,6 +51,8 @@ describe("toKanaFinal", () => {
   it("commits held-back n", () => {
     expect(toKanaFinal("じn")).toBe("じん");
     expect(toKanaFinal("じnn")).toBe("じん");
+    expect(toKanaFinal("じん")).toBe("じん");
+    expect(toKanaFinal("こn'")).toBe("こん");
     expect(toKanaFinal("ra-men")).toBe("らーめん");
   });
 

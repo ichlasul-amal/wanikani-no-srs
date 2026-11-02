@@ -13,18 +13,20 @@ function prepare(text: string): string {
     .toLowerCase()
     .replace(/tch/g, "cch")
     .replace(/dzu/g, "du")
+    .replace(/ん(?=[aiueoy])/g, "nn") // "nn" already showed as ん while typing
     .replace(/(?<!n)nn(?=[aiueoy])/g, "n'n");
 }
 
-// Conversion while typing: romaji that may still change (a trailing "n",
-// "nn" or lone consonant) is left as-is until the next letter arrives.
+// Conversion while typing: romaji that may still change (a trailing "n" or
+// lone consonant) is left as-is until the next letter arrives. "n'" is held
+// too: as a bare ん, the next vowel or "y" would read it as "nn".
 export function toKanaWhileTyping(text: string): string {
   const s = prepare(text);
-  if (s.endsWith("nn")) return toKana(s.slice(0, -2), IME) + "nn";
-  return toKana(s, IME);
+  const held = /n'y?$/.exec(s)?.[0] ?? "";
+  return toKana(s.slice(0, s.length - held.length), IME) + held;
 }
 
 // Conversion on submit: commit anything that was being held back.
 export function toKanaFinal(text: string): string {
-  return toKana(toKanaWhileTyping(text).replace(/nn$/, "n"));
+  return toKana(toKanaWhileTyping(text));
 }
