@@ -129,6 +129,14 @@ describe("App", () => {
     expect(levelButton(/level 4$/i).disabled).toBe(true);
   });
 
+  it("starts the level list at the person's level", async () => {
+    const offsetLeft = vi.spyOn(HTMLElement.prototype, "offsetLeft", "get").mockReturnValue(120);
+    const user = userEvent.setup();
+    await connect(user);
+    expect(levelButton(/^level 1\b/i).parentElement?.scrollLeft).toBe(120);
+    offsetLeft.mockRestore();
+  });
+
   it("walks through lessons with cross-level relations", async () => {
     const user = userEvent.setup();
     const lessons = await connect(user);

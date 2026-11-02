@@ -80,19 +80,19 @@ export default function Dashboard({ user, settings, setSettings, onStudy, onQuiz
   const { levels, types, questionTypes, order, repeatWrong } = settings;
   const [multiSelect, setMultiSelect] = useState(levels.length > 1);
   const levelScrollRef = useRef<HTMLDivElement>(null);
-  const activeLevelRef = useRef<HTMLButtonElement>(null);
+  const userLevelRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     store.ensureLevels(levels);
     store.ensureSynonyms();
   }, [store, levels]);
 
-  // Bring the selected level into view when the dashboard opens.
+  // Start the level list at the person's own level when the dashboard opens.
   useLayoutEffect(() => {
     const container = levelScrollRef.current;
-    const button = activeLevelRef.current;
+    const button = userLevelRef.current;
     if (!container || !button) return;
-    container.scrollLeft = button.offsetLeft - container.clientWidth / 2 + button.clientWidth / 2;
+    container.scrollLeft = button.offsetLeft;
   }, []);
 
   const statuses = levels.map((level) => ({ level, ...data.levelStatus(level) }));
@@ -183,14 +183,14 @@ export default function Dashboard({ user, settings, setSettings, onStudy, onQuiz
           >
             <ChevronLeft size={16} />
           </button>
-          <div ref={levelScrollRef} className="flex gap-2 overflow-x-auto scroll-smooth scrollbar-hide py-1">
+          <div ref={levelScrollRef} className="relative flex gap-2 overflow-x-auto scrollbar-hide py-1">
             {ALL_LEVELS.map((lvl) => {
               const locked = lvl > user.maxLevelGranted;
               const selected = levels.includes(lvl);
               return (
                 <button
                   key={lvl}
-                  ref={lvl === levels[0] ? activeLevelRef : undefined}
+                  ref={lvl === user.level ? userLevelRef : undefined}
                   type="button"
                   onClick={() => selectLevel(lvl)}
                   disabled={locked}
